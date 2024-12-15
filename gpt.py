@@ -286,7 +286,14 @@ if __name__ == "__main__":
             print("No trained model found. Please train the model first.")
             exit(1)
 
+        # Handle empty context
+        if not args.context:
+            print("No context provided. Starting text generation from scratch.")
+            # Initialize with a special start token or an empty tensor
+            context = torch.zeros((1, 1), dtype=torch.long, device=device)
+        else:
+            context = torch.tensor([encode(args.context)], dtype=torch.long, device=device)
+
         # Generate text
-        context = torch.tensor([encode(args.context)], dtype=torch.long, device=device)
         generated = generate_text(model, context, args.max_new_tokens)
         print(decode(generated[0].tolist()))

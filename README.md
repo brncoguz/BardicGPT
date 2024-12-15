@@ -2,7 +2,7 @@
 
 This project implements a GPT-like language model from scratch using PyTorch. The model is trained on the Tiny Shakespeare dataset, which consists of text sequences from the works of Shakespeare. The goal is to generate text sequences in the style of Shakespeare using a transformer-based architecture.
 
-# Some of the output
+# Example generated data
 
     MENENIUS:
     Good demesday, you before:
@@ -22,10 +22,13 @@ This project implements a GPT-like language model from scratch using PyTorch. Th
 
     you can see more in the more.txt
 
-# Usage
+#### Usage
 
-- Train the model by running:
+##### Train the model by running:
+
     python3 gpt.py --mode train
+
+###### Example Output
 
     step 0: train loss 4.2221, val loss 4.2306
     New best model saved with val loss 4.2306 at step 0
@@ -39,11 +42,13 @@ This project implements a GPT-like language model from scratch using PyTorch. Th
     step 4999: train loss 0.8537, val loss 1.5712
     Training complete. Best model saved at: checkpoints/best_model.pth with val loss 1.4881
 
-- --resume: Resume training from a previously saved checkpoint
+#### --resume: Resume training from a previously saved checkpoint
     python3 gpt.py --mode train --resume
 
-- Generate Text
+#### Generate Text
     python3 gpt.py --mode generate --context "To be or not to be" --max_new_tokens 100
+
+###### Example Output
 
     Loaded model from the best model checkpoint.
     To be or not to bear yours.
