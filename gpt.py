@@ -1,22 +1,24 @@
-import torch
-import torch.nn as nn
-from torch.nn import functional as F
 import argparse
 import os
+import torch
+import torch.nn as nn
+
+from torch.nn import functional as F
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 # hyperparameters
 batch_size = 64
 block_size = 256
 max_iters = 5000
-eval_interval = 500
+eval_interval = 100
 learning_rate = 3e-4
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # device = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
-eval_iters = 200
+eval_iters = 50
 n_embd = 384
 n_head = 6
 n_layer = 6
-dropout = 0.2
+dropout = 0.3
 
 # torch.manual_seed(1337)
 
@@ -198,12 +200,15 @@ def train_model(model, optimizer, train_data, val_data):
     best_val_loss = float('inf')  # Initialize with a large value
     best_model_path = "checkpoints/best_model.pth"
 
+    # Learning rate scheduler
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2, threshold=1e-4, verbose=True)
+
     for iter in range(max_iters):
         if iter % eval_interval == 0 or iter == max_iters - 1:
             # Evaluate losses on train and val sets
             losses = estimate_loss(model, train_data, val_data)
             train_loss, val_loss = losses['train'], losses['val']
-            print(f"step {iter}: train loss {train_loss:.4f}, val loss {val_loss:.4f}")
+            print(f"step {iter}: train loss {train_loss:.4f}, val loss {val_loss:.4f}, perplexity {torch.exp(val_loss).item()}")
 
             # Save the model if the validation loss is the lowest so far
             if val_loss < best_val_loss:
@@ -211,6 +216,8 @@ def train_model(model, optimizer, train_data, val_data):
                 os.makedirs("checkpoints", exist_ok=True)
                 torch.save(model.state_dict(), best_model_path)
                 print(f"New best model saved with val loss {val_loss:.4f} at step {iter}")
+
+            scheduler.step(val_loss)
 
         # Fetch a batch of training data
         xb, yb = get_batch('train', train_data, val_data, batch_size, block_size)
@@ -258,7 +265,7 @@ if __name__ == "__main__":
 
     # Initialize the model and optimizer
     model = GPTLanguageModel().to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
 
     if args.mode == "train":
         # Resume training if --resume is specified

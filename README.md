@@ -4,23 +4,23 @@ This project implements a GPT-like language model from scratch using PyTorch. Th
 
 # Some of the output
 
-MENENIUS:
-Good demesday, you before:
-You mean to another house, to enprove
-The saint-taste of his charity,
-As would becomfore a gentle-pater in the back.
+    MENENIUS:
+    Good demesday, you before:
+    You mean to another house, to enprove
+    The saint-taste of his charity,
+    As would becomfore a gentle-pater in the back.
 
-Servant:
-Pitain is it your sin By his haste; marrying
-yoed ather and squirbing for you whas she
-love-the meant have told your natural in the
-stains of an one four. Swear you were to virtuous
-as put locked into the fruit-bed moan'd with a meads;
-aidly, and these apped, ere all two kinsmen's liberance a glotten
-mads if for what it enemy, we will deh go'er, to content for
-the mortal letter, which sent bles, they were too soon.
+    Servant:
+    Pitain is it your sin By his haste; marrying
+    yoed ather and squirbing for you whas she
+    love-the meant have told your natural in the
+    stains of an one four. Swear you were to virtuous
+    as put locked into the fruit-bed moan'd with a meads;
+    aidly, and these apped, ere all two kinsmen's liberance a glotten
+    mads if for what it enemy, we will deh go'er, to content for
+    the mortal letter, which sent bles, they were too soon.
 
-you can see more in the more.txt
+    you can see more in the more.txt
 
 # Usage
 
@@ -33,15 +33,7 @@ you can see more in the more.txt
     New best model saved with val loss 1.9108 at step 500
     step 1000: train loss 1.3913, val loss 1.5995
     New best model saved with val loss 1.5995 at step 1000
-    step 1500: train loss 1.2724, val loss 1.5328
-    New best model saved with val loss 1.5328 at step 1500
-    step 2000: train loss 1.1845, val loss 1.5063
-    New best model saved with val loss 1.5063 at step 2000
-    step 2500: train loss 1.1188, val loss 1.5017
-    New best model saved with val loss 1.5017 at step 2500
-    step 3000: train loss 1.0661, val loss 1.4881
-    New best model saved with val loss 1.4881 at step 3000
-    step 3500: train loss 1.0151, val loss 1.5160
+    ...
     step 4000: train loss 0.9568, val loss 1.5237
     step 4500: train loss 0.9057, val loss 1.5417
     step 4999: train loss 0.8537, val loss 1.5712
