@@ -1,66 +1,48 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+import argparse
+import os
 
 # hyperparameters
-batch_size = 64 # how many independent sequences will we process in parallel?
-block_size = 256 # what is the maximum context length for predictions?
+batch_size = 64
+block_size = 256
 max_iters = 5000
 eval_interval = 500
 learning_rate = 3e-4
-device = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
-print(f'{device=}')
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+# device = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
 eval_iters = 200
 n_embd = 384
 n_head = 6
 n_layer = 6
 dropout = 0.2
-# ------------
 
 torch.manual_seed(1337)
 
-# wget https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt
-with open('input.txt', 'r', encoding='utf-8') as f:
-    text = f.read()
+# Dataset and encoding
+def prepare_data():
+    with open('input.txt', 'r', encoding='utf-8') as f:
+        text = f.read()
+    chars = sorted(list(set(text)))
+    stoi = {ch: i for i, ch in enumerate(chars)}
+    itos = {i: ch for i, ch in enumerate(chars)}
+    encode = lambda s: [stoi[c] for c in s]
+    decode = lambda l: ''.join([itos[i] for i in l])
+    data = torch.tensor(encode(text), dtype=torch.long)
+    n = int(0.9 * len(data))
+    train_data = data[:n]
+    val_data = data[n:]
+    return train_data, val_data, len(chars), encode, decode
 
-# here are all the unique characters that occur in this text
-chars = sorted(list(set(text)))
-vocab_size = len(chars)
-# create a mapping from characters to integers
-stoi = { ch:i for i,ch in enumerate(chars) }
-itos = { i:ch for i,ch in enumerate(chars) }
-encode = lambda s: [stoi[c] for c in s] # encoder: take a string, output a list of integers
-decode = lambda l: ''.join([itos[i] for i in l]) # decoder: take a list of integers, output a string
+train_data, val_data, vocab_size, encode, decode = prepare_data()
 
-# Train and test splits
-data = torch.tensor(encode(text), dtype=torch.long)
-n = int(0.9*len(data)) # first 90% will be train, rest val
-train_data = data[:n]
-val_data = data[n:]
-
-# data loading
-def get_batch(split):
-    # generate a small batch of data of inputs x and targets y
+def get_batch(split, train_data, val_data, batch_size, block_size):
     data = train_data if split == 'train' else val_data
     ix = torch.randint(len(data) - block_size, (batch_size,))
     x = torch.stack([data[i:i+block_size] for i in ix])
     y = torch.stack([data[i+1:i+block_size+1] for i in ix])
-    x, y = x.to(device), y.to(device)
-    return x, y
-
-@torch.no_grad()
-def estimate_loss():
-    out = {}
-    model.eval()
-    for split in ['train', 'val']:
-        losses = torch.zeros(eval_iters)
-        for k in range(eval_iters):
-            X, Y = get_batch(split)
-            logits, loss = model(X, Y)
-            losses[k] = loss.item()
-        out[split] = losses.mean()
-    model.train()
-    return out
+    return x.to(device), y.to(device)
 
 class Head(nn.Module):
     """ one head of self-attention """
@@ -196,31 +178,76 @@ class GPTLanguageModel(nn.Module):
             idx = torch.cat((idx, idx_next), dim=1) # (B, T+1)
         return idx
 
-model = GPTLanguageModel()
-m = model.to(device)
-# print the number of parameters in the model
-print(sum(p.numel() for p in m.parameters())/1e6, 'M parameters')
+# Loss Estimation
+@torch.no_grad()
+def estimate_loss(model, train_data, val_data):
+    out = {}
+    model.eval()
+    for split in ['train', 'val']:
+        losses = torch.zeros(eval_iters)
+        for k in range(eval_iters):
+            X, Y = get_batch(split, train_data, val_data, batch_size, block_size)
+            logits, loss = model(X, Y)
+            losses[k] = loss.item()
+        out[split] = losses.mean()
+    model.train()
+    return out
 
-# create a PyTorch optimizer
-optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+# Training function
+def train_model(model, optimizer, train_data, val_data):
+    for iter in range(max_iters):
+        if iter % eval_interval == 0 or iter == max_iters - 1:
+            losses = estimate_loss(model, train_data, val_data)
+            print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
-for iter in range(max_iters):
+        xb, yb = get_batch('train', train_data, val_data, batch_size, block_size)
+        logits, loss = model(xb, yb)
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
 
-    # every once in a while evaluate the loss on train and val sets
-    if iter % eval_interval == 0 or iter == max_iters - 1:
-        losses = estimate_loss()
-        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+    # Save the trained model
+    os.makedirs("checkpoints", exist_ok=True)
+    torch.save(model.state_dict(), "checkpoints/gpt_model.pth")
+    print("Model saved to checkpoints/gpt_model.pth")
 
-    # sample a batch of data
-    xb, yb = get_batch('train')
+# Generation function
+def generate_text(model, context, max_new_tokens):
+    model.eval()
+    with torch.no_grad():
+        for _ in range(max_new_tokens):
+            context_cond = context[:, -block_size:]
+            logits, _ = model(context_cond)
+            logits = logits[:, -1, :]
+            probs = F.softmax(logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+            context = torch.cat((context, next_token), dim=1)
+    return context
 
-    # evaluate the loss
-    logits, loss = model(xb, yb)
-    optimizer.zero_grad(set_to_none=True)
-    loss.backward()
-    optimizer.step()
+# Main execution block
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", type=str, choices=["train", "generate"], required=True, help="Mode to run the script in")
+    parser.add_argument("--load_model", action="store_true", help="Load a pre-trained model")
+    parser.add_argument("--context", type=str, default="", help="Context string to generate text from")
+    parser.add_argument("--max_new_tokens", type=int, default=500, help="Number of tokens to generate")
+    args = parser.parse_args()
 
-# generate from the model
-context = torch.zeros((1, 1), dtype=torch.long, device=device)
-print(decode(m.generate(context, max_new_tokens=500)[0].tolist()))
-open('more.txt', 'w').write(decode(m.generate(context, max_new_tokens=10000)[0].tolist()))
+    # Initialize the model and optimizer
+    model = GPTLanguageModel().to(device)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+
+    if args.load_model and os.path.exists("checkpoints/gpt_model.pth"):
+        model.load_state_dict(torch.load("checkpoints/gpt_model.pth"))
+        print("Loaded model from checkpoints/gpt_model.pth")
+
+    if args.mode == "train":
+        train_model(model, optimizer, train_data, val_data)
+
+    elif args.mode == "generate":
+        if not args.load_model:
+            print("Error: Model not trained. Use --load_model to load a trained model.")
+            exit(1)
+        context = torch.tensor([[encode(c) for c in args.context]], dtype=torch.long, device=device)
+        generated = generate_text(model, context, args.max_new_tokens)
+        print(decode(generated[0].tolist()))
