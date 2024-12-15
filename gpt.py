@@ -18,7 +18,7 @@ n_head = 6
 n_layer = 6
 dropout = 0.2
 
-torch.manual_seed(1337)
+# torch.manual_seed(1337)
 
 # Dataset and encoding
 def prepare_data():
@@ -195,40 +195,63 @@ def estimate_loss(model, train_data, val_data):
 
 # Training function
 def train_model(model, optimizer, train_data, val_data):
+    best_val_loss = float('inf')  # Initialize with a large value
+    best_model_path = "checkpoints/best_model.pth"
+
     for iter in range(max_iters):
         if iter % eval_interval == 0 or iter == max_iters - 1:
+            # Evaluate losses on train and val sets
             losses = estimate_loss(model, train_data, val_data)
-            print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+            train_loss, val_loss = losses['train'], losses['val']
+            print(f"step {iter}: train loss {train_loss:.4f}, val loss {val_loss:.4f}")
 
+            # Save the model if the validation loss is the lowest so far
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                os.makedirs("checkpoints", exist_ok=True)
+                torch.save(model.state_dict(), best_model_path)
+                print(f"New best model saved with val loss {val_loss:.4f} at step {iter}")
+
+        # Fetch a batch of training data
         xb, yb = get_batch('train', train_data, val_data, batch_size, block_size)
+
+        # Forward pass and compute loss
         logits, loss = model(xb, yb)
+
+        # Backward pass and optimization step
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
 
-    # Save the trained model
-    os.makedirs("checkpoints", exist_ok=True)
-    torch.save(model.state_dict(), "checkpoints/gpt_model.pth")
-    print("Model saved to checkpoints/gpt_model.pth")
+    print(f"Training complete. Best model saved at: {best_model_path} with val loss {best_val_loss:.4f}")
 
-# Generation function
 def generate_text(model, context, max_new_tokens):
-    model.eval()
+    """
+    Generate text from a trained model.
+
+    Args:
+        model: The trained GPT model.
+        context: A tensor of shape (batch_size, context_length).
+        max_new_tokens: Number of tokens to generate.
+
+    Returns:
+        Tensor of shape (batch_size, context_length + max_new_tokens).
+    """
+    model.eval()  # Set the model to evaluation mode
     with torch.no_grad():
         for _ in range(max_new_tokens):
-            context_cond = context[:, -block_size:]
-            logits, _ = model(context_cond)
+            context_cond = context[:, -block_size:]  # Truncate to block size (2D tensor)
+            logits, _ = model(context_cond)  # Forward pass through the model
             logits = logits[:, -1, :]
-            probs = F.softmax(logits, dim=-1)
-            next_token = torch.multinomial(probs, num_samples=1)
-            context = torch.cat((context, next_token), dim=1)
+            probs = F.softmax(logits, dim=-1)  # Convert logits to probabilities
+            next_token = torch.multinomial(probs, num_samples=1)  # Sample the next token (2D: batch_size x 1)
+            context = torch.cat((context, next_token), dim=1)  # Append the new token (2D tensor)
     return context
 
-# Main execution block
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", type=str, choices=["train", "generate"], required=True, help="Mode to run the script in")
-    parser.add_argument("--load_model", action="store_true", help="Load a pre-trained model")
+    parser.add_argument("--resume", action="store_true", help="Resume training from the best model checkpoint")
     parser.add_argument("--context", type=str, default="", help="Context string to generate text from")
     parser.add_argument("--max_new_tokens", type=int, default=500, help="Number of tokens to generate")
     args = parser.parse_args()
@@ -237,17 +260,26 @@ if __name__ == "__main__":
     model = GPTLanguageModel().to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
-    if args.load_model and os.path.exists("checkpoints/gpt_model.pth"):
-        model.load_state_dict(torch.load("checkpoints/gpt_model.pth"))
-        print("Loaded model from checkpoints/gpt_model.pth")
-
     if args.mode == "train":
+        # Resume training if --resume is specified
+        if args.resume:
+            if os.path.exists("checkpoints/best_model.pth"):
+                model.load_state_dict(torch.load("checkpoints/best_model.pth"))
+                print("Resuming training from the best model checkpoint.")
+            else:
+                print("No checkpoint found to resume training. Starting from scratch.")
         train_model(model, optimizer, train_data, val_data)
 
     elif args.mode == "generate":
-        if not args.load_model:
-            print("Error: Model not trained. Use --load_model to load a trained model.")
+        # Load model for generation
+        if os.path.exists("checkpoints/best_model.pth"):
+            model.load_state_dict(torch.load("checkpoints/best_model.pth"))
+            print("Loaded model from the best model checkpoint.")
+        else:
+            print("No trained model found. Please train the model first.")
             exit(1)
-        context = torch.tensor([[encode(c) for c in args.context]], dtype=torch.long, device=device)
+
+        # Generate text
+        context = torch.tensor([encode(args.context)], dtype=torch.long, device=device)
         generated = generate_text(model, context, args.max_new_tokens)
         print(decode(generated[0].tolist()))

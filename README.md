@@ -22,6 +22,47 @@ the mortal letter, which sent bles, they were too soon.
 
 you can see more in the more.txt
 
+# Usage
+
+- Train the model by running:
+    python3 gpt.py --mode train
+
+    step 0: train loss 4.2221, val loss 4.2306
+    New best model saved with val loss 4.2306 at step 0
+    step 500: train loss 1.7526, val loss 1.9108
+    New best model saved with val loss 1.9108 at step 500
+    step 1000: train loss 1.3913, val loss 1.5995
+    New best model saved with val loss 1.5995 at step 1000
+    step 1500: train loss 1.2724, val loss 1.5328
+    New best model saved with val loss 1.5328 at step 1500
+    step 2000: train loss 1.1845, val loss 1.5063
+    New best model saved with val loss 1.5063 at step 2000
+    step 2500: train loss 1.1188, val loss 1.5017
+    New best model saved with val loss 1.5017 at step 2500
+    step 3000: train loss 1.0661, val loss 1.4881
+    New best model saved with val loss 1.4881 at step 3000
+    step 3500: train loss 1.0151, val loss 1.5160
+    step 4000: train loss 0.9568, val loss 1.5237
+    step 4500: train loss 0.9057, val loss 1.5417
+    step 4999: train loss 0.8537, val loss 1.5712
+    Training complete. Best model saved at: checkpoints/best_model.pth with val loss 1.4881
+
+- --resume: Resume training from a previously saved checkpoint
+    python3 gpt.py --mode train --resume
+
+- Generate Text
+    python3 gpt.py --mode generate --context "To be or not to be" --max_new_tokens 100
+
+    Loaded model from the best model checkpoint.
+    To be or not to bear yours.
+
+    LUCIO:
+    He's right.
+
+    ISABELLA:
+    Pray you, be your brother; he lmast, he did bumne a
+    contrad
+
 ## Dataset
 
 The model uses the Tiny Shakespeare dataset, which consists of sequences from Shakespeare's works.
