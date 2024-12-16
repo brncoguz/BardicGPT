@@ -280,7 +280,10 @@ if __name__ == "__main__":
     elif args.mode == "generate":
         # Load model for generation
         if os.path.exists("checkpoints/best_model.pth"):
-            model.load_state_dict(torch.load("checkpoints/best_model.pth"))
+            if torch.cuda.is_available():
+                model.load_state_dict(torch.load("checkpoints/best_model.pth"))
+            else:
+                model.load_state_dict(torch.load("checkpoints/best_model.pth", map_location=torch.device('cpu')))
             print("Loaded model from the best model checkpoint.")
         else:
             print("No trained model found. Please train the model first.")
