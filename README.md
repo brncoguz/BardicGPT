@@ -1,4 +1,4 @@
-# Tiny Shakespeare GPT
+# BardicGPT
 
 This project implements a GPT-like language model from scratch using PyTorch. The model is trained on the Tiny Shakespeare dataset, which consists of text sequences from the works of Shakespeare. The goal is to generate text sequences in the style of Shakespeare using a transformer-based architecture.
 
